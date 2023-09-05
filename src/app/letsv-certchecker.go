@@ -2,9 +2,9 @@ package main
 
 import (
     "context"
+    "crypto/tls"
     "fmt"
     "log"
-    "os"
     "runtime"
     "sync"
     "time"
@@ -28,7 +28,6 @@ func getDbConnectionParams() map[string]string {
 
     if err != nil {
         log.Fatalf("Unable to load SDK config: %v", err)
-        os.Exit(1)
     }
 
     // Get the SSM client
@@ -57,7 +56,6 @@ func getDbConnectionParams() map[string]string {
 
     if err != nil {
         log.Fatalf("Could not get params")
-        os.Exit(1)
     }
 
     dbParams := make(map[string]string)
@@ -80,7 +78,6 @@ func getDbHandle( dbConnectionParams map[string]string ) *pgx.Conn {
 
     if err != nil {
         log.Fatalf("Bombed out in DB connection: %v", err )
-        os.Exit(1)
     }
 
     return conn
@@ -94,7 +91,6 @@ func getCertsToRetrieve( dbHandle *pgx.Conn ) map[string]string {
 
     if err != nil {
         log.Fatalf("Error hit when pulling URL rows: %v", err )
-        os.Exit( 1 )
     }
 
     // https://pkg.go.dev/github.com/jackc/pgx/v5#Rows
@@ -105,7 +101,6 @@ func getCertsToRetrieve( dbHandle *pgx.Conn ) map[string]string {
 
         if err != nil {
             log.Fatalf("Error reading values but next returned true")
-            os.Exit(1)
         }
 
         // Use type assertions to force the values in the returned array from
@@ -129,7 +124,6 @@ func getCertsToRetrieve( dbHandle *pgx.Conn ) map[string]string {
 
         if err != nil {
             log.Fatalf("Could not get value out of UUID bytes: %v\n", err )
-            os.Exit(1)
         }
 
         // Need to use type assertion to get back to string
@@ -155,19 +149,36 @@ func urlWorkerEntryPoint( dbConnectionParams map[string]string, urlChannel chan 
     //dbHandle := getDbHandle( dbConnectionParams )
     _ = getDbHandle( dbConnectionParams )
 
+    tlsCfg := &tls.Config{}
+
     timedOut := false
     
     // Do a read with timeout on the channel for new URL info
     for timedOut == false {
         select {
         case urlToCheck := <- urlChannel:
-            fmt.Printf("Worker got URL to test with ID %s and URL %s\n", urlToCheck.urlId, urlToCheck.url )
+            fmt.Printf("Worker got URL to test: %s\n", urlToCheck.url )
 
+            testingHost := urlToCheck.url[8:]
+            //fmt.Printf("Extracted hostname: %s\n", testingHost)
 
+            // Do the pull of TLS cert to get all the data for the database
 
-            // Do a very short sleep but it's a point to hand off CPU resources
-            // to other goroutines that are ready to do some processing
-            time.Sleep( 25 * time.Millisecond )
+            conn, err := tls.Dial( "tcp", testingHost + ":443", tlsCfg )
+
+            if err != nil {
+                log.Fatalf("Error in TLS dial: %v\n", err )
+            } else {
+                certs := conn.ConnectionState().PeerCertificates
+                conn.Close()
+
+                // Leaf cert (the one we validate against) is the first one in
+                // the list of peer certs
+                leafCert := certs[0]
+                
+                fmt.Println("Cert subject common name (CN): ", leafCert.Subject.CN, ", issuer: ", leafCert.Issuer)
+
+            }
 
         case <- time.After(1 * time.Second):
             // We timed out, note that we want to bail from the loop
