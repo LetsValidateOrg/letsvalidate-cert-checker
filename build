@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+DOCKER="/usr/bin/docker"
+
+${DOCKER} build ./src
