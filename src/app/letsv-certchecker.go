@@ -10,7 +10,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/ssm"
 
     // PGSQL client lib
-    //"github.com/jackc/pgx/v5"
+    "github.com/jackc/pgx/v5"
 )
 
 
@@ -50,7 +50,7 @@ func getDbConnectionParams() map[string]string {
     }
 
     dbParams := make(map[string]string)
-    dbParamsKeys := []string{ "dbhost", "dbname", "dbpassword", "dbuser" }
+    dbParamsKeys := []string{ "host", "dbname", "password", "user" }
     for idx, currParam := range paramOutput.Parameters {
         dbParams[dbParamsKeys[idx]] = *currParam.Value
     }
@@ -58,14 +58,28 @@ func getDbConnectionParams() map[string]string {
     return dbParams
 }
 
+func getDbHandle( dbConnectionParams map[string]string ) *pgx.Conn {
+    // https://pkg.go.dev/github.com/jackc/pgx/v5#Connect
+    connectionString := fmt.Sprintf("host=%s user=%s password=%s dbname=%s", 
+        dbConnectionParams["host"], 
+        dbConnectionParams["user"],
+        dbConnectionParams["password"],
+        dbConnectionParams["dbname"] )
+    conn, err := pgx.Connect( context.Background(), connectionString )
+
+    if err != nil {
+        log.Fatalf("Bombed out in DB connection: %v", err )
+    }
+
+    return conn
+}
+
 
 
 func main() {
     dbConnectionParams := getDbConnectionParams()
+    dbHandle := getDbHandle( dbConnectionParams )
 
-    for k, v := range dbConnectionParams {
-        fmt.Println(k + " " + v) 
-    }
 
 
     // Connect to SSM to get PGSQL params
