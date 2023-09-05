@@ -7,9 +7,7 @@ COPY app/*.go ./src/
 
 # Create Go module so that "go get" words, and then install our Go dependencies 
 RUN go mod init letsv-certchecker
-RUN go get github.com/aws/aws-sdk-go-v2/aws
-RUN go get github.com/aws/aws-sdk-go-v2/config
-RUN go get github.com/aws/aws-sdk-go-v2/service/ssm
+RUN go get github.com/aws/aws-sdk-go-v2/aws github.com/aws/aws-sdk-go-v2/config github.com/aws/aws-sdk-go-v2/service/ssm
 
 # Build our app 
 RUN go build -o bin/letsv-certchecker src/letsv-certchecker.go

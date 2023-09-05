@@ -24,9 +24,8 @@ func main() {
     }
 
     // Get the SSM client
-    //ssmClient := ssm.NewFromConfig(cfg)
-    _ = ssm.NewFromConfig(cfg)
-    /*
+    ssmClient := ssm.NewFromConfig(cfg)
+    //_ = ssm.NewFromConfig(cfg)
 
     // Docs for this stuff: https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/ssm#Client.GetParameters
 
@@ -65,7 +64,6 @@ func main() {
 
     // Wait on workgroup
 
-    */
     // At this point, we're last process running, so we can exit cleanly
     fmt.Println("Exiting cleanly")
 }
