@@ -4,6 +4,7 @@ import (
     "context"
     "fmt"
     "log"
+    "strconv"
 
     //"github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -41,13 +42,24 @@ func main() {
         WithDecryption  : withDecryption,
     }
         
-    _, err = ssmClient.GetParameters(context.TODO(), getParamsInput)
+    paramOutput, err := ssmClient.GetParameters(context.TODO(), getParamsInput)
 
     if err != nil {
         log.Fatalf("Could not get params")
     }
 
     fmt.Println("Whoah got a param?!?!?")
+
+    // Print invalid parameters
+    fmt.Println("Length of invalid parameters array : " + strconv.Itoa(len(paramOutput.InvalidParameters)) )
+    fmt.Println("Length of parameter details array  : " + strconv.Itoa(len(paramOutput.Parameters)) )
+
+    // Did we really get it
+    parameterName   := *paramOutput.Parameters[0].Name;
+    parameterValue  := *paramOutput.Parameters[0].Value
+
+    fmt.Println("Got parameter with name \"" + parameterName + "\" and value \"" + parameterValue + "\"" )
+
 
     // Connect to SSM to get PGSQL params
     //ssmClient := createSSMClient()
