@@ -5,8 +5,10 @@ import (
     "fmt"
     "log"
     "os"
+    "runtime"
+    "sync"
+    "time"
 
-    //"github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/ssm"
 
@@ -14,6 +16,11 @@ import (
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgtype"
 )
+
+type channelUrlInfo struct {
+    urlId   string
+    url     string
+}
 
 
 func getDbConnectionParams() map[string]string {
@@ -79,11 +86,6 @@ func getDbHandle( dbConnectionParams map[string]string ) *pgx.Conn {
     return conn
 }
 
-/*
-func encodeUUID(src [16]byte) string {
-	return fmt.Sprintf("%x-%x-%x-%x-%x", src[0:4], src[4:6], src[6:8], src[8:10], src[10:16])
-}
-*/
 
 func getCertsToRetrieve( dbHandle *pgx.Conn ) map[string]string {
     collectedUrlInfo := make(map[string]string)
@@ -113,6 +115,13 @@ func getCertsToRetrieve( dbHandle *pgx.Conn ) map[string]string {
 
         // Wow was that a hard type to work with.
         //      https://github.com/jackc/pgx/blob/v5.4.3/pgtype/uuid.go
+        //
+        //      Turns out we can't call pgtype.encodeUUID directly because it
+        //      starts with a lowercase letter. That's tripped me up twice.
+        //      
+        //      Forced to bounce through pgtype.UUID and do all of the Value()
+        //      and type assertions BS to get out the string representation of
+        //      the GUID.
         urlIdUuid := pgtype.UUID{ Bytes: currUrlIdBytes, Valid: true }
 
         // Use a type assertion to get it out of a driver.Value into a string
@@ -138,8 +147,79 @@ func getCertsToRetrieve( dbHandle *pgx.Conn ) map[string]string {
 }
 
 
+func urlWorkerEntryPoint( dbConnectionParams map[string]string, urlChannel chan channelUrlInfo, wg *sync.WaitGroup ) {
+    // Make sure we note we're done on the way out
+    defer wg.Done()
+
+    // Create our goroutine's individual DB connection
+    //dbHandle := getDbHandle( dbConnectionParams )
+    _ = getDbHandle( dbConnectionParams )
+
+    timedOut := false
+    
+    // Do a read with timeout on the channel for new URL info
+    for timedOut == false {
+        select {
+        case urlToCheck := <- urlChannel:
+            fmt.Printf("Worker got URL to test with ID %s and URL %s\n", urlToCheck.urlId, urlToCheck.url )
+
+
+
+            // Do a very short sleep but it's a point to hand off CPU resources
+            // to other goroutines that are ready to do some processing
+            time.Sleep( 25 * time.Millisecond )
+
+        case <- time.After(1 * time.Second):
+            // We timed out, note that we want to bail from the loop
+            timedOut = true
+        }
+    }
+
+    // The defer will make sure we call done on the waitgroup on the way out
+}
+
+func pullCertsAndWriteToPgsqlWorkersKv( dbConnectionParams map[string]string, certsToCheck map[string]string ) {
+    // create channel to pass URL's
+    uriDataChannel := make(chan channelUrlInfo)
+
+    // Create workers waitgroup
+    wg := &sync.WaitGroup{}
+
+    numberOfWorkerProcesses := runtime.NumCPU() * 8
+
+
+    // Fire off worker goroutines that read form the channel, incrementing waitgroup each time
+    for i := 0; i < numberOfWorkerProcesses; i++ {
+        go urlWorkerEntryPoint( dbConnectionParams, uriDataChannel, wg )
+        
+        // Add to the waitgroup so we know how many goroutines need to finish
+        // before Wait() will return
+        wg.Add(1)
+    }
+
+    // Write all the URL info into the channel for the workers to Do Their
+    // Thing(tm)
+    for k, v := range certsToCheck {
+        currUrlInfo := channelUrlInfo{
+            urlId   : k,
+            url     : v,
+        }
+
+        uriDataChannel <- currUrlInfo
+    }
+
+
+    // Wait on workgroup
+    wg.Wait()
+
+    fmt.Println("All child worker goroutines have returned cleanly" )
+}
+
+
 
 func main() {
+    fmt.Println("letsv-cert-checker starting")
+
     dbConnectionParams  := getDbConnectionParams()
     dbHandle            := getDbHandle( dbConnectionParams )
 
@@ -147,24 +227,9 @@ func main() {
     // (meaning main exits)
     defer dbHandle.Close(context.Background())
 
-    _ = getCertsToRetrieve( dbHandle )
+    certsToCheck := getCertsToRetrieve( dbHandle )
 
+    pullCertsAndWriteToPgsqlWorkersKv( dbConnectionParams, certsToCheck )
 
-    // Connect to SSM to get PGSQL params
-    //ssmClient := createSSMClient()
-
-    // connect to PGSQL
-
-    // Pull list of URL's that need to be checked
-
-    // create channel to pass URL's 
-
-    // Create workers waitgroup
-
-    // Fire off worker goroutines, incrementing waitgroup each time
-
-    // Wait on workgroup
-
-    // At this point, we're last process running, so we can exit cleanly
-    fmt.Println("Exiting cleanly")
+    fmt.Println("letsv-cert-checked exiting cleanly")
 }
