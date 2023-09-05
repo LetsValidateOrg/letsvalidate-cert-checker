@@ -8,12 +8,13 @@ import (
     //"github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/ssm"
+
+    // PGSQL client lib
+    //"github.com/jackc/pgx/v5"
 )
 
 
-
-
-func main() {
+func getDbConnectionParams() map[string]string {
     cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-2") )
 
     if err != nil {
@@ -37,11 +38,11 @@ func main() {
     // string types, but it has to get passed to compile
     var withDecryption *bool
 
-    getParamsInput := &ssm.GetParametersInput{ 
-        Names           : parameterNames, 
+    getParamsInput := &ssm.GetParametersInput{
+        Names           : parameterNames,
         WithDecryption  : withDecryption,
     }
-        
+
     paramOutput, err := ssmClient.GetParameters(context.TODO(), getParamsInput)
 
     if err != nil {
@@ -51,7 +52,19 @@ func main() {
     dbParams := make(map[string]string)
     dbParamsKeys := []string{ "dbhost", "dbname", "dbpassword", "dbuser" }
     for idx, currParam := range paramOutput.Parameters {
-        dbParams[dbParamKeys[idx]] = *currParam.Value
+        dbParams[dbParamsKeys[idx]] = *currParam.Value
+    }
+
+    return dbParams
+}
+
+
+
+func main() {
+    dbConnectionParams := getDbConnectionParams()
+
+    for k, v := range dbConnectionParams {
+        fmt.Println(k + " " + v) 
     }
 
 
