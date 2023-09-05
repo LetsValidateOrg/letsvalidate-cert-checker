@@ -1,5 +1,6 @@
 #!/usr/bin/bash
 
 DOCKER="/usr/bin/docker"
+TAGNAME=letsvalidate/cert-checker:latest
 
-${DOCKER} build ./src
+${DOCKER} build -t ${TAGNAME} ./src
