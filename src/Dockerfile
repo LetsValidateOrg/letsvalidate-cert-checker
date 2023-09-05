@@ -11,8 +11,9 @@ RUN go get github.com/aws/aws-sdk-go-v2/aws
 RUN go get github.com/aws/aws-sdk-go-v2/config
 RUN go get github.com/aws/aws-sdk-go-v2/service/ssm
 
-# Build our app
-RUN go build -o bin/letsv-certchecker src/letsv-certchecker.go
+# Build our app -- The "CGO_ENABLED=0" is critical -- that makes a
+# statically-linked executable
+RUN CGO_ENABLED=0 go build -o bin/letsv-certchecker src/letsv-certchecker.go
 
 
 # Drop to alpine, the smallest Linux distro we can find, as Go binaries are statically
@@ -21,4 +22,5 @@ FROM alpine:3.18
 WORKDIR /opt/letsvalidate
 COPY --from=builder /tmp/build/bin/letsv-certchecker .
 ENTRYPOINT ["./letsv-certchecker"]
+#ENTRYPOINT ["/bin/sh"]
 

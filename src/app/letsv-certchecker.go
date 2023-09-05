@@ -7,22 +7,30 @@ import (
 
     //"github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
-    "github.com/aws/aws-sdk-go-v2/service/ssm"
+    //"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
 
 
 
 func main() {
-    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-2") )
+    // Oh shit is it this? Bad C lib? https://github.com/aws/aws-sdk-go/issues/4835#issuecomment-1544383910
+
+    fmt.Println("Starting up")
+    myContext := context.TODO()
+    //_ = context.TODO()
+    //cfg, err := config.LoadDefaultConfig(myContext, config.WithRegion("us-east-2") )
+    _, err := config.LoadDefaultConfig(myContext, config.WithRegion("us-east-2") )
 
     if err != nil {
         log.Fatalf("Unable to load SDK config: %v", err)
     }
 
+    /*
     // Get the SSM client
     //ssmClient := ssm.NewFromConfig(cfg)
-    ssmClient := ssm.NewFromConfig(cfg)
+    //ssmClient := ssm.NewFromConfig(cfg)
+    _ = ssm.NewFromConfig(cfg)
 
     // Docs for this stuff: https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/ssm#Client.GetParameters
 
@@ -44,6 +52,8 @@ func main() {
         log.Fatalf("Could not get params")
     }
 
+    fmt.Println("Whoah got a param?!?!?")
+
     // Connect to SSM to get PGSQL params
     //ssmClient := createSSMClient()
 
@@ -59,6 +69,7 @@ func main() {
 
     // Wait on workgroup
 
+    */
     // At this point, we're last process running, so we can exit cleanly
     fmt.Println("Exiting cleanly")
 }
