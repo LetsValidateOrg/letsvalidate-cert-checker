@@ -21,6 +21,5 @@ RUN CGO_ENABLED=0 go build -o bin/letsv-certchecker src/letsv-certchecker.go
 FROM alpine:3.18
 WORKDIR /opt/letsvalidate
 COPY --from=builder /tmp/build/bin/letsv-certchecker .
-ENTRYPOINT ["./letsv-certchecker"]
-#ENTRYPOINT ["/bin/sh"]
-
+#ENTRYPOINT ["./letsv-certchecker"]
+ENTRYPOINT ["/bin/sh"]
